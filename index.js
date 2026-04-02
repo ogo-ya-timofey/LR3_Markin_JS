@@ -83,7 +83,7 @@ app.post("/transfer", (req, res) => {
 });
 
 // Страница злоумышленника (CSRF‑атака)
-app.get("/hacker", (req, res) => {
+app.get("/attacker", (req, res) => {
   res.send(`
 <!DOCTYPE html>
 <html>
